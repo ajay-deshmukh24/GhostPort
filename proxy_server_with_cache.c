@@ -101,6 +101,89 @@ int sendErrorMessage(int socket,int status_code){
 }
 
 
+int handle_request(int clientSocket,ParsedRequest* request,char *tempReq){
+
+    // we need to go through unparsing because raw request received from client i.e. stored in tempReq may have malformed or partial request. Headers like Host, connection, or User-Agent might be missing 
+
+    char* buf = (char*) malloc(sizeof(char)*MAX_BYTES);
+    strcpy(buf,"GET ");
+    strcat(buf,request->path);
+    strcat(buf," ");
+    strcat(buf,request->version);
+    strcat(buf,"\r\n");
+
+    size_t len = strlen(buf);
+
+    if(ParsedHeader_set(request,"Connection","close") < 0){
+        printf("set header key not work\n");
+    }
+
+    if(ParsedHeader_get(request,"Host") == NULL){
+        if(ParsedHeader_set(request,"Host",request->host)<0){
+            printf("set \"Host\" header key not working\n");
+        }
+    }
+
+    if(ParsedRequest_unparse_headers(request,buf+len,(size_t)MAX_BYTES-len)<0){
+        printf("unparse failed\n");
+        //if this happens still try to send request without headers
+    }
+
+    int server_port = 80 //default remote server port
+    if(request->port != NULL){
+        server_port = atoi(request->port);
+    }
+
+    // Establish a TCP connection to the actual destination server (like www.google.com on port 80).
+    int remoteSocketID = connectRemoteServer(request->host,server_port);
+
+    if(remoteSocketID < 0)return -1;
+
+    // Send the HTTP request you constructed (buf) to the remote server.
+    int bytes_send = send(remoteSocketID,buf,strlen(buf),0);
+    
+    bzero(buf,MAX_BYTES);
+
+    // now receive response in chunks
+    bytes_send = recv(remoteSocketID,buf,MAX_BYTES-1,0);
+    char* temp_buffer = (char*)malloc(sizeof(char)*MAX_BYTES); //temp buffer
+    int temp_buffer_size = MAX_BYTES;
+    int temp_buffer_index = 0;
+
+    while(bytes_send > 0){
+
+        // send what received to actual client
+        bytes_send = send(clientSocket,buf,bytes_send,0);
+
+        for(int i=0;i<bytes_send/sizeof(char);i++){
+            temp_buffer[temp_buffer_index] = buf[i];
+            // printf("%c",buf[i]); // Response Printing
+			temp_buffer_index++;
+        }
+        temp_buffer_size += MAX_BYTES;
+        temp_buffer = (char*)realloc(temp_buffer,temp_buffer_size);
+
+        if(bytes_send < 0){
+            perror("Error in sending data to client socket\n");
+            break;
+        }
+        bzero(buf,MAX_BYTES);
+
+        bytes_send = recv(remoteSocketID,buf,MAX_BYTES-1,0);
+    }
+    temp_buffer[temp_buffer_index]='\0';
+	free(buf);
+    
+    add_cache_element(temp_buffer,strlen(temp_buffer),tempReq);
+    printf("done\n");
+    free(temp_buffer);
+
+    close(remoteSocketID);
+    return 0;
+
+}
+
+
 int checkHTTPversion(char* msg){
     int version = -1;
 
