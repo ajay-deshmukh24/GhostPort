@@ -17,6 +17,7 @@
 #include <time.h>
 
 
+#define MAX_BYTES 4096    //max allowed size of request/response
 #define MAX_CLIENTS 10
 typedef struct cache_element cache_element
 
@@ -53,6 +54,83 @@ cache_element* head;  //head pointer to cache
 int cache_size;  // cache_size denotes current size of cache
 
 
+
+void* thread_fn(void* socketNew){
+    
+    // check if we have any thread available
+    sem_wait(&seamaphore);
+
+    int p;
+    sem_getvalue(&seamaphore,&p);
+    printf("seamaphore value: %d\n",p);
+
+    // socketNew is pointer to socketId of client
+    int* t = (int*)(socketNew);
+    int socket = *t; //socket is socket descriptor of connected client
+    int bytes_send_client,len;    //Bytes Transfered
+
+    char* buffer = (char*) calloc(MAX_BYTES,sizeof(char));  // creating buffer of 4kb for a client
+
+    bzero(buffer,MAX_BYTES);
+    bytes_send_client = recv(socket,buffer,MAX_BYTES,0); // receving the request of client by proxy server
+    // recv() waits until data is available
+
+    // recv() doesn't guarantee that you'll get all the data at once — it might come in chunks
+    while(bytes_send_client > 0){
+        len = strlen(buffer);
+        //loop until u find "\r\n\r\n" in the buffer
+        if(strstr(buffer,"\r\n\r\n")==NULL){
+            bytes_send_client = recv(socket,buffer+len,MAX_BYTES-len,0);
+        }
+        else break;
+    }
+
+    char* tempReq = (char*) malloc(strlen(buffer)*sizeof(char)+1);
+    // tempReq, buffer both store the http request sent by client
+    for(int i=0;i<strlen(buffer);i++){
+        tempReq[i] = buffer[i];
+    }
+
+    // check for request in cache
+    struct cache_element* temp = find(tempReq);
+
+    if(temp!=NULL){
+        // request found in cache, so sending the response to client from proxy's cache
+        int size = temp->len/size(char);
+        int pos = 0;
+        char response[MAX_BYTES];
+        while(pos<size){
+            bzero(response,MAX_BYTES);
+            for(int i=0;i<MAX_BYTES;i++){
+                response[i] = temp->data[pos];
+                pos++;
+            }
+            send(socket,response,MAX_BYTES,0);
+        }
+        printf("Data retrived from the cache\n");
+        printf("%s\n\n",response);
+    }
+    else if(bytes_send_client > 0){
+        // pending...
+    }
+    else if(bytes_send_client < 0){
+        perror("Error in receiving from client\n");
+    }
+    else if(bytes_send_client == 0){
+        printf("client disconnected !\n");
+    }
+
+    shutdown(socket,SHUT_RDWR);
+    close(socket);
+    free(buffer);
+    sem_post(&seamaphore); // increase the value of seamaphore
+
+    sem_getvalue(&seamaphore,&p);
+    printf("Seamaphore post value: %d\n",p);
+    free(tempReq);
+    return NULL;
+
+}
 
 
 int main(int argc,char* argv[]){
@@ -183,4 +261,4 @@ int main(int argc,char* argv[]){
 
     close(proxy_socketId);
     return 0;
-}
+} 
