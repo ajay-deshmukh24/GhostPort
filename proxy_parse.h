@@ -41,7 +41,7 @@ struct ParsedHeader{
     size_t keylen;
     char *value;
     size_t valuelen;
-}
+};
 
 
 /*

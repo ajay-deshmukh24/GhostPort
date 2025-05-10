@@ -179,7 +179,7 @@ void ParsedHeader_destroy(struct ParsedRequest *pr){
     size_t i=0;
     while(i < pr->headersused){
         ParsedHeader_destroyOne(pr->headers+i);
-        i++:
+        i++;
     }
     pr->headersused=0;
 
@@ -210,7 +210,7 @@ int ParsedHeader_parse(struct ParsedRequest *pr,char *line){
     memcpy(value,index1,(index2-index1));
     value[index2-index1] = '\0';
 
-    parsedHeader_set(pr,key,value);
+    ParsedHeader_set(pr,key,value);
     free(key);
     free(value);
     return 0;
@@ -241,7 +241,7 @@ struct ParsedRequest* ParsedRequest_create(){
     pr = (struct ParsedRequest*) malloc(sizeof(struct ParsedRequest));
 
     if(pr!=NULL){
-        parsedHeader_create(pr);
+        ParsedHeader_create(pr);
         pr->method = NULL;
         pr-> protocol = NULL;
         pr->host = NULL;
@@ -352,7 +352,7 @@ int ParsedRequest_parse(struct ParsedRequest* parse,const char* buf,int buflen){
 
     /*Parse request line*/
     /*strtok() function here splits string with first occurence of space*/
-    parse->method = strtok(parse->buf," ",&saveptr);
+    parse->method = strtok_r(parse->buf," ",&saveptr);
 
     if(parse->method==NULL){
         debug("invalid request line, no whitespace\n");
@@ -381,12 +381,12 @@ int ParsedRequest_parse(struct ParsedRequest* parse,const char* buf,int buflen){
     }
 
     /*check for version*/
-    parse->version = full_addr + strlen(full_adder)+1;
+    parse->version = full_addr + strlen(full_addr)+1;
 
     if(parse->version==NULL){
         debug("invalid request line, missing version\n");
         free(tmp_buf);
-        free(prase->buf);
+        free(parse->buf);
         parse->buf = NULL;
         return -1;
     }
@@ -399,7 +399,7 @@ int ParsedRequest_parse(struct ParsedRequest* parse,const char* buf,int buflen){
     }
 
     /*check for protocol*/
-    parse->protocol = strtok(full_addr,"://",&saveptr);
+    parse->protocol = strtok_r(full_addr,"://",&saveptr);
     if(parse->protocol==NULL){
         debug("invalid request line, missing host\n");
         free(tmp_buf);
