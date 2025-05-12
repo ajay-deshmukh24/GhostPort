@@ -1,4 +1,4 @@
-<h1>Multi Threaded Proxy Server with and without Cache</h1>
+<h1>Multi Threaded Proxy Server with Cache</h1>
 
 This project is implemented using `C` and Parsing of HTTP referred from <a href = "https://github.com/vaibhavnaagar/proxy-server"> Proxy Server </a>
 
@@ -59,6 +59,9 @@ This project is implemented using `C` and Parsing of HTTP referred from <a href 
 # Note :-
 
 - Code is well commented. For any doubt you can refer to the comments.
+- Code is only for Linux systems.
+- If you have windows system then you should install Linux enviornment and run using curl from terminal
+- If your browser gives any issue with connecting to proxy server you can save "proxy.pac" file given and add url to proxy settings of your browser
 
 ## How to Run
 
@@ -69,7 +72,11 @@ $ make
 $ ./proxy <port no.>
 ```
 
-`Open http://localhost:port/https://www.cs.princeton.edu/`
+- For Linux system
+  `Open http://localhost:port/https://www.cs.princeton.edu/`
+
+- For Windows system with ubuntu installed
+  `In terminal open curl -v http://localhost:8080/https://www.cs.princeton.edu/`
 
 # Note:
 
