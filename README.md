@@ -78,6 +78,7 @@ $ ./proxy <port no.>
 
 - For Windows system with ubuntu installed  
   `In terminal open curl -v http://<Proxy_IP>:8080/https://www.cs.princeton.edu/`
+```
 
 # Note:
 
@@ -99,4 +100,7 @@ $ ./proxy <port no.>
 Feel free to add some useful. You can see `How this code can be extended`. Use ideas from there and feel free to fork and CHANGE.
 
 #### Enjoy CODE and pull requests are highly appreciated.
+
+```
+
 ```
