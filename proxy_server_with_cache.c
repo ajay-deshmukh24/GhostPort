@@ -105,7 +105,8 @@ int sendErrorMessage(int socket,int status_code){
 
 
 int connectRemoteServer(char* host_addr,int port_num){
-    printf("inside connectRemoteServer\n");
+    // printf("inside connectRemoteServer\n");
+
     // Creating socket for remote server
     int remoteSocket = socket(AF_INET,SOCK_STREAM,0);
     if(remoteSocket < 0){
@@ -117,13 +118,13 @@ int connectRemoteServer(char* host_addr,int port_num){
     struct hostent *host = gethostbyname(host_addr);
     
     if(host==NULL){
-        printf("stopped by gethostbyname function\n");
+        // printf("stopped by gethostbyname function\n");
         fprintf(stderr,"No such host exists\n");
         return -1;
     }
-    else{
-        printf("host returned from gethostbyname function %s\n",host->h_name);
-    }
+    // else{
+    //     printf("host returned from gethostbyname function %s\n",host->h_name);
+    // }
 
     // inserts ip address and port number of host in struct 'server_addr'
     struct sockaddr_in server_addr;
@@ -151,7 +152,8 @@ int connectRemoteServer(char* host_addr,int port_num){
 int handle_request(int clientSocket,struct ParsedRequest* request,char *tempReq){
 
     // we need to go through unparsing because raw request received from client i.e. stored in tempReq may have malformed or partial request. Headers like Host, connection, or User-Agent might be missing 
-    printf("In handel_request started unparsing request\n");
+
+    // printf("In handel_request started unparsing request\n");
     char* buf = (char*) malloc(sizeof(char)*MAX_BYTES);
     strcpy(buf,"GET ");
     strcat(buf,request->path);
@@ -183,9 +185,9 @@ int handle_request(int clientSocket,struct ParsedRequest* request,char *tempReq)
 
     // Establish a TCP connection to the actual destination server (like www.google.com on port 80).
 
-    printf("calling connectRemoteServer with host %s and port %d\n",request->host,server_port);
+    // printf("calling connectRemoteServer with host %s and port %d\n",request->host,server_port);
     int remoteSocketID = connectRemoteServer(request->host,server_port);
-    printf("back in handle request function\n");
+    // printf("back in handle request function\n");
 
     if(remoteSocketID < 0)return -1;
 
@@ -225,10 +227,10 @@ int handle_request(int clientSocket,struct ParsedRequest* request,char *tempReq)
     temp_buffer[temp_buffer_index]='\0';
 	free(buf);
     
-    printf("received reponse from server now its time to add it in cache\n");
+    // printf("received reponse from server now its time to add it in cache\n");
     add_cache_element(temp_buffer,strlen(temp_buffer),tempReq);
     printf("added to cache\n");
-    printf("handeling request done\n");
+    printf("done\n");
     free(temp_buffer);
 
     close(remoteSocketID);
@@ -251,7 +253,8 @@ int checkHTTPversion(char* msg){
 
 void* thread_fn(void* socketNew){
     // socketNew is pointer to socketId of client
-    printf("thread function started\n");
+
+    // printf("thread function started\n");
     
     // check if we have any thread available
     sem_wait(&semaphore);
@@ -289,7 +292,8 @@ void* thread_fn(void* socketNew){
     tempReq[strlen(buffer)] = '\0';  // Ensure null-terminated string
 
     // Print the copied HTTP request
-    printf("HTTP Request:\n%s\n", tempReq);
+
+    // printf("HTTP Request:\n%s\n", tempReq);
 
     // check for request in cache
     printf("now finding data in cache\n");
@@ -327,20 +331,20 @@ void* thread_fn(void* socketNew){
         }
         else{
 
-            printf("Parsing succesfull\n");
-            printf("request method is %s\n",request->method);
-            printf("request protocol is %s\n",request->protocol);
-            printf("request host is %s\n",request->host);         
-            printf("request port is %s\n",request->port);         
-            printf("request path is %s\n",request->path);         
-            printf("request version is %s\n",request->version);         
-            printf("request is %s\n",request->buf);         
+            // printf("Parsing succesfull\n");
+            // printf("request method is %s\n",request->method);
+            // printf("request protocol is %s\n",request->protocol);
+            // printf("request host is %s\n",request->host);         
+            // printf("request port is %s\n",request->port);         
+            // printf("request path is %s\n",request->path);         
+            // printf("request version is %s\n",request->version);         
+            // printf("request is %s\n",request->buf);         
 
             bzero(buffer,MAX_BYTES);
             if(!strcmp(request->method,"GET")){
                 if(request->host && request->path && (checkHTTPversion(request->version)==1)){
 
-                    printf("Now go for handeling the request\n");
+                    // printf("Now go for handeling the request\n");
                     bytes_send_client = handle_request(socket,request,tempReq);
                     if(bytes_send_client==-1){
                         sendErrorMessage(socket, 500);
@@ -374,7 +378,7 @@ void* thread_fn(void* socketNew){
     sem_getvalue(&semaphore,&p);
     printf("Semaphore post value: %d\n",p);
     free(tempReq);
-    printf("thread function completed\n");
+    // printf("thread function completed\n");
     return NULL;
 
 }
@@ -502,7 +506,8 @@ int main(int argc,char* argv[]){
         printf("Client is connected with port number: %d and ip adress: %s\n",ntohs(client_addr.sin_port),str);
 
         // creating thread for each accepted client
-        printf("assigning thread to the client\n");
+        
+        // printf("assigning thread to the client\n");
         pthread_create(&tid[i],NULL,thread_fn,(void*)&Connected_socketId[i]); 
         i++;
     }
