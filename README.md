@@ -73,10 +73,10 @@ $ ./proxy <port no.>
 ```
 
 - For Linux system
-  `Open http://localhost:port/https://www.cs.princeton.edu/`
+  Open `http://localhost:port/https://www.cs.princeton.edu/`
 
 - For Windows system with ubuntu installed
-  `In terminal open curl -v http://localhost:8080/https://www.cs.princeton.edu/`
+  In terminal open `curl -v http://<Proxy_Ip>:8080/https://www.cs.princeton.edu/`
 
 # Note:
 
