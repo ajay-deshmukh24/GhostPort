@@ -60,8 +60,8 @@ This project is implemented using `C` and Parsing of HTTP referred from <a href 
 
 - Code is well commented. For any doubt you can refer to the comments.
 - Code is only for Linux systems.
-- If you have windows system then you should install Linux enviornment and run using curl from terminal
-- If your browser gives any issue with connecting to proxy server you can save "proxy.pac" file given and add url to proxy settings of your browser
+- If you have windows system then you should install Linux enviornment and run using curl from terminal and if you want to run from browser use IP of your ubuntu enviornment in plcae of localhost in test url.
+- Use Icognito window in both linux and windows system so that browser's cache will not interrupt.
 
 ## How to Run
 
@@ -73,16 +73,12 @@ $ ./proxy <port no.>
 ```
 
 ```markdown
-- For Linux system pen
+- For Linux system open through browser
   `http://localhost:port/https://www.cs.princeton.edu/`
 
-- For Windows system with ubuntu installed in terminal open  
-  `curl -v http://<Proxy_IP>:8080/https://www.cs.princeton.edu/`
+- For Windows system with linux envoirnment installed open  
+  `http://<Ubuntu_IP>:port/https://www.cs.princeton.edu/`
 ```
-
-# Note:
-
-- This code can only be run in Linux Machine. Please disable your browser cache or you can run in icognito window.
 
 ## Demo
 
