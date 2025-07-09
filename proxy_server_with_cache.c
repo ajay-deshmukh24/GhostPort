@@ -40,7 +40,7 @@ cache_element* find(char *url);
 // function to add new node to linked list
 int add_cache_element(char *data,int size,char *url);
 
-// function to remove least recent;y used element
+// function to remove least recently used element
 void remove_cache_element();
 
 
@@ -103,50 +103,47 @@ int sendErrorMessage(int socket,int status_code){
     return 1;
 }
 
+int connectRemoteServer(char* host_addr, int port_num) {
+    int remoteSocket;
+    struct addrinfo hints, *res, *p;
+    char port_str[6]; // max length of port number string (65535 + \0)
 
-int connectRemoteServer(char* host_addr,int port_num){
-    // printf("inside connectRemoteServer\n");
+    snprintf(port_str, sizeof(port_str), "%d", port_num);
 
-    // Creating socket for remote server
-    int remoteSocket = socket(AF_INET,SOCK_STREAM,0);
-    if(remoteSocket < 0){
-        printf("Error in creating socket\n");
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;        // IPv4
+    hints.ai_socktype = SOCK_STREAM;  // TCP
+
+    int status = getaddrinfo(host_addr, port_str, &hints, &res);
+    if (status != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
         return -1;
     }
 
-    // get host by the name or ip address provided
-    struct hostent *host = gethostbyname(host_addr);
-    
-    if(host==NULL){
-        // printf("stopped by gethostbyname function\n");
-        fprintf(stderr,"No such host exists\n");
+    for (p = res; p != NULL; p = p->ai_next) {
+        remoteSocket = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (remoteSocket == -1) continue;
+
+        if (connect(remoteSocket, p->ai_addr, p->ai_addrlen) == -1) {
+            close(remoteSocket);
+            continue;
+        }
+
+        // successfully connected
+        break;
+    }
+
+    freeaddrinfo(res); // clean up
+
+    if (p == NULL) {
+        fprintf(stderr, "Error: Failed to connect to remote server\n");
         return -1;
     }
-    // else{
-    //     printf("host returned from gethostbyname function %s\n",host->h_name);
-    // }
-
-    // inserts ip address and port number of host in struct 'server_addr'
-    struct sockaddr_in server_addr;
-
-    bzero((char*)&server_addr,sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port_num);
-
-    bcopy((char*)host->h_addr,(char*)&server_addr.sin_addr.s_addr,host->h_length);
-
-    // connect to remote server ----------
-
-    if( connect(remoteSocket, (struct sockaddr*)&server_addr, (socklen_t)sizeof(server_addr)) < 0 )
-	{
-		fprintf(stderr, "Error in connecting !\n"); 
-		return -1;
-	}
 
     printf("remote server connected\n");
-	// free(host_addr);
-	return remoteSocket;
+    return remoteSocket;
 }
+
 
 
 int handle_request(int clientSocket,struct ParsedRequest* request,char *tempReq){
@@ -169,7 +166,7 @@ int handle_request(int clientSocket,struct ParsedRequest* request,char *tempReq)
 
     if(ParsedHeader_get(request,"Host") == NULL){
         if(ParsedHeader_set(request,"Host",request->host)<0){
-            printf("set \"Host\" header key not working\n");
+            printf("set Host header key not working\n");
         }
     }
 
@@ -263,7 +260,7 @@ void* thread_fn(void* socketNew){
     sem_getvalue(&semaphore,&p);
     printf("semaphore value: %d\n",p);
 
-    int* t = (int*)(socketNew);
+    int* t = (int*)socketNew;
     int socket = *t; //socket is socket descriptor of connected client
     int bytes_send_client,len;    //Bytes Transfered
 
@@ -324,7 +321,7 @@ void* thread_fn(void* socketNew){
         // parsing the request
         struct ParsedRequest* request = ParsedRequest_create();
 
-        // ParsedRequest_parse returns 0 on success and -1 on failure. On success it stores parsed request request 
+        // ParsedRequest_parse returns 0 on success and -1 on failure. On success it stores parsed request in request 
 
         if(ParsedRequest_parse(request,buffer,len)<0){
             printf("Parsing failed\n");
@@ -468,11 +465,12 @@ int main(int argc,char* argv[]){
 
 
     int i=0; //Iterator for thread_id(tid) and Accept client_socket for each thread
-    int Connected_socketId[MAX_CLIENTS]; //this array stores sockket descriptors of connected clients
+    int Connected_socketId[MAX_CLIENTS]; //this array stores socket descriptors of connected clients
 
-    // Infinite Loop for acceoting clients
+    // Infinite Loop for accepting clients
     while(1){
         bzero((char*)&client_addr,sizeof(client_addr));
+        client_len = sizeof(client_addr);
 
         // Accepting the connections
         client_socketId = accept(proxy_socketId,(struct sockaddr*)&client_addr,(socklen_t*)&client_len);
@@ -507,7 +505,7 @@ int main(int argc,char* argv[]){
 
         // creating thread for each accepted client
         
-        // printf("assigning thread to the client\n");
+        printf("assigning thread to the client\n");
         pthread_create(&tid[i],NULL,thread_fn,(void*)&Connected_socketId[i]); 
         i++;
     }
@@ -522,35 +520,34 @@ cache_element* find(char* url){
     cache_element* site = NULL;
     
     int temp_lock_val = pthread_mutex_lock(&lock);
-    printf("Remove cache lock Acquired %d\n", temp_lock_val);
+    printf("find cache lock Acquired %d\n", temp_lock_val);
 
-    if(head!=NULL){
-        site = head;
-        while(site!=NULL){
-            if(!strcmp(site->url,url)){
-                printf("LRU Time Track Before : %ld\n",site->lru_time_track);
-                printf("url found\n");
-                // update the time_track
-                site->lru_time_track = time(NULL);
-                printf("LRU Time Track After: %ld\n",site->lru_time_track);
-                break;
-            }
-            site=site->next;
+    site = head;
+    while(site!=NULL){
+        if(!strcmp(site->url,url)){
+            printf("LRU Time Track Before: %ld\n",site->lru_time_track);
+            printf("url found\n");
+            // update the time_track
+            site->lru_time_track = time(NULL);
+            printf("LRU Time Track After:%ld\n",site->lru_time_track);
+            break;
         }
+        site=site->next;
     }
-    else{
+    
+    if(!site){
         printf("url not found\n");
     }
 
     temp_lock_val = pthread_mutex_unlock(&lock);
-    printf("Remove Cache Lock Unlocked %d\n",temp_lock_val); 
+    printf("find Cache Lock Unlocked %d\n",temp_lock_val); 
     return site;
 
 }
 
 
 void remove_cache_element(){
-    //if cache is not empty searches for the node which has atleast lru_time_track and deletes it
+    //if cache is not empty searches for the node which has least lru_time_track and deletes it
     cache_element* p; //previous pointer
     cache_element* q; //next pointer;
     cache_element* temp; //element to remove
@@ -559,13 +556,17 @@ void remove_cache_element(){
     printf("Remove Cache Lock Acquired %d\n",temp_lock_val); 
 
     if(head!=NULL){
-        for(q=head,p=head,temp=head;q->next!=NULL;q=q->next){
+        q=head;p=head;temp=head;
+        while(q->next!=NULL){
             // iterate through entire cache and search for oldest time track
             if(((q->next)->lru_time_track) < (temp->lru_time_track)){
                 temp=q->next;
                 p=q;
             }
+
+            q=q->next;
         }
+        
         if(temp==head)head=head->next;
         else p->next = temp->next;
 
