@@ -150,7 +150,8 @@ int handle_request(int clientSocket,struct ParsedRequest* request,char *tempReq)
 
     // we need to go through unparsing because raw request received from client i.e. stored in tempReq may have malformed or partial request. Headers like Host, connection, or User-Agent might be missing 
 
-    // printf("In handel_request started unparsing request\n");
+    printf("now rebulding request\n");
+
     char* buf = (char*) malloc(sizeof(char)*MAX_BYTES);
     strcpy(buf,"GET ");
     strcat(buf,request->path);
@@ -159,15 +160,21 @@ int handle_request(int clientSocket,struct ParsedRequest* request,char *tempReq)
     strcat(buf,"\r\n");
 
     size_t len = strlen(buf);
+    // printf("rebuilt request is\n");
+    // printf("%s",buf);
 
     if(ParsedHeader_set(request,"Connection","close") < 0){
         printf("set header key not work\n");
     }
 
-    if(ParsedHeader_get(request,"Host") == NULL){
-        if(ParsedHeader_set(request,"Host",request->host)<0){
-            printf("set Host header key not working\n");
-        }
+    // if(ParsedHeader_get(request,"Host") == NULL){
+    //     if(ParsedHeader_set(request,"Host",request->host)<0){
+    //         printf("set Host header key not working\n");
+    //     }
+    // }
+
+    if(ParsedHeader_set(request,"Host",request->host)<0){
+        printf("set Host header key not working\n");
     }
 
     if(ParsedRequest_unparse_headers(request,buf+len,(size_t)MAX_BYTES-len)<0){
@@ -182,14 +189,13 @@ int handle_request(int clientSocket,struct ParsedRequest* request,char *tempReq)
 
     // Establish a TCP connection to the actual destination server (like www.google.com on port 80).
 
-    // printf("calling connectRemoteServer with host %s and port %d\n",request->host,server_port);
     int remoteSocketID = connectRemoteServer(request->host,server_port);
     // printf("back in handle request function\n");
 
     if(remoteSocketID < 0)return -1;
 
     // Send the HTTP request you constructed (buf) to the remote server.
-    printf("constructed request to send to remote sever is \n%s\n",buf);
+    // printf("constructed request to send to remote sever is \n%s\n",buf);
     int bytes_send = send(remoteSocketID,buf,strlen(buf),0);
     
     bzero(buf,MAX_BYTES);
@@ -288,13 +294,11 @@ void* thread_fn(void* socketNew){
 
     tempReq[strlen(buffer)] = '\0';  // Ensure null-terminated string
 
-    // Print the copied HTTP request
-
-    // printf("HTTP Request:\n%s\n", tempReq);
+    printf("HTTP Request:\n%s\n", tempReq);
 
     // check for request in cache
     printf("now finding data in cache\n");
-    struct cache_element* temp = find(tempReq);
+    cache_element* temp = find(tempReq);
 
     if(temp!=NULL){
         // request found in cache, so sending the response to client from proxy's cache
@@ -302,14 +306,19 @@ void* thread_fn(void* socketNew){
         int size = temp->len/sizeof(char);
         int pos = 0;
         char response[MAX_BYTES];
+
         while(pos<size){
             bzero(response,MAX_BYTES);
-            for(int i=0;i<MAX_BYTES;i++){
+            int chunk_size = (size - pos >= MAX_BYTES) ? MAX_BYTES : (size - pos);
+
+            // Copy only `chunk_size` bytes
+            for (int i = 0; i < chunk_size; i++) {
                 response[i] = temp->data[pos];
                 pos++;
             }
-            send(socket,response,MAX_BYTES,0);
+            send(socket, response, chunk_size, 0);
         }
+
         printf("Data retrived from the cache\n");
         printf("%s\n\n",response);
     }
@@ -326,16 +335,7 @@ void* thread_fn(void* socketNew){
         if(ParsedRequest_parse(request,buffer,len)<0){
             printf("Parsing failed\n");
         }
-        else{
-
-            // printf("Parsing succesfull\n");
-            // printf("request method is %s\n",request->method);
-            // printf("request protocol is %s\n",request->protocol);
-            // printf("request host is %s\n",request->host);         
-            // printf("request port is %s\n",request->port);         
-            // printf("request path is %s\n",request->path);         
-            // printf("request version is %s\n",request->version);         
-            // printf("request is %s\n",request->buf);         
+        else{ 
 
             bzero(buffer,MAX_BYTES);
             if(!strcmp(request->method,"GET")){
@@ -383,23 +383,11 @@ void* thread_fn(void* socketNew){
 
 int main(int argc,char* argv[]){
 
-    // argc --> count of command line arguments
-    // argv[] --> array of string holding arguments
-    // ./proxy 8080 hello.txt
-
-    struct sockaddr_in server_addr,client_addr; //address of client and server to be assigned
+    struct sockaddr_in server_addr,client_addr; // to store IP address and port number of server and client
 
     int client_socketId; // stores socketId of client wants to connect
     socklen_t client_len = sizeof(client_addr); //store length of adress
 
-    /*
-        struct sockaddr_in {
-            sa_family_t    sin_family;   // Address family (AF_INET for IPv4)
-            in_port_t      sin_port;     // Port number (must be in network byte order)
-            struct in_addr sin_addr;     // IP address (in struct form)
-            char           sin_zero[8];  // Padding (not used, just to match struct size with sockaddr)
-        };
-    */
 
     sem_init(&semaphore,0,MAX_CLIENTS); //initialize semaphore
     // 0 --> minimum value
@@ -424,10 +412,7 @@ int main(int argc,char* argv[]){
     
     // open listening socket on primary side of proxy server
     proxy_socketId = socket(AF_INET,SOCK_STREAM,0);
-    // creates TCP socket that uses IPv4
-    // AF_INET --> address family --> Use IPv4
-    // SCOKET_STREAM --> socket type --> TCP
-    // 0 --> default protocol
+    // Create an IPv4 TCP socket, using the system’s default TCP protocol.
 
     if(proxy_socketId < 0){
        perror("Failed to create a socket\n");
@@ -435,9 +420,12 @@ int main(int argc,char* argv[]){
     }
 
     int reuse = 1;
-    // check if we can reuse same adress
-    if (setsockopt(proxy_socketId, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0) 
-    perror("setsockopt(SO_REUSEADDR) failed\n");
+    // if you stop your server and try to restart it quickly, you might get this error:
+    // bind: Address already in use
+    if (setsockopt(proxy_socketId, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0){
+        //  is a standard C function that prints a human-readable error message
+        perror("setsockopt(SO_REUSEADDR) failed\n");
+    }
 
     bzero((char*)&server_addr,sizeof(server_addr));
     server_addr.sin_family = AF_INET;  // communication over an IPv4 network
@@ -446,7 +434,7 @@ int main(int argc,char* argv[]){
  
 
     // Binding the socket
-
+    // bind the socket we created with server_address we created for our proxy
     if(bind(proxy_socketId,(struct sockaddr*)&server_addr,sizeof(server_addr)) < 0){
         perror("Port is not free\n");
         exit(1);
@@ -455,6 +443,10 @@ int main(int argc,char* argv[]){
 
 
     // proxy socket listening to the requests
+    // I’m ready to accept incoming connections
+    // listen() tells the OS: “Start queueing incoming connections.”
+    // accept() will later pick a client from this queue.
+    // If more than MAX_CLIENTS try to connect at the same time, new clients may be refused
 
     int listen_status = listen(proxy_socketId,MAX_CLIENTS);
 

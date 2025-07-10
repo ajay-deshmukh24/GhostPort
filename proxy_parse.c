@@ -90,17 +90,44 @@ struct ParsedHeader* ParsedHeader_get(struct ParsedRequest *pr,const char *key){
 
 
 /*remove the specified key from parsedHeader*/
-int ParsedHeader_remove(struct ParsedRequest *pr,const char *key){
-    struct ParsedHeader *tmp;
-    tmp = ParsedHeader_get(pr,key);
-    if(tmp==NULL){
-        return -1;
+// int ParsedHeader_remove(struct ParsedRequest *pr,const char *key){
+//     struct ParsedHeader *tmp;
+//     tmp = ParsedHeader_get(pr,key);
+//     if(tmp==NULL){
+//         return -1;
+//     }
+//     free(tmp->key);
+//     free(tmp->value);
+//     tmp->key = NULL;
+//     return 0;
+// }
+
+int ParsedHeader_remove(struct ParsedRequest *pr, const char *key) {
+    int removed = 0;
+
+    for (size_t i = 0; i < pr->headersused; ) {
+        struct ParsedHeader *hdr = &pr->headers[i];
+        if (hdr->key && strcmp(hdr->key, key) == 0) {
+            // Free memory
+            free(hdr->key);
+            free(hdr->value);
+
+            // Shift the rest of the headers left
+            for (size_t j = i; j < pr->headersused - 1; j++) {
+                pr->headers[j] = pr->headers[j + 1];
+            }
+
+            pr->headersused--;
+            removed = 1;
+            // Don't increment i — we need to check the new header at index i
+        } else {
+            i++;
+        }
     }
-    free(tmp->key);
-    free(tmp->value);
-    tmp->key = NULL;
-    return 0;
+
+    return removed ? 0 : -1;
 }
+
 
 
 
@@ -194,7 +221,7 @@ int ParsedHeader_parse(struct ParsedRequest *pr,char *line){
     char *index1;
     char *index2;
 
-    index1 = index(line,':');
+    index1 = strchr(line,':');
     if(index1==NULL){
         debug("No colon found\n");
         return -1;
@@ -390,6 +417,7 @@ int ParsedRequest_parse(struct ParsedRequest* parse,const char* buf,int buflen){
         parse->buf = NULL;
         return -1;
     }
+    
     if(strncmp(parse->version,"HTTP/",5)){
         debug("invalid request line, unspported version %s\n",parse->version);
         free(tmp_buf);
